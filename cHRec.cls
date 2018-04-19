@@ -144,6 +144,7 @@ Dim digit                           As Boolean
             Set h = New cHour
             
             ' cancella gli eventuali codici precedenti se persistenti
+            ' ma solitamente non c'è nella
             Set hs = .GroupPreAss.Contains(cfgCode) ' feriale
             If Not (hs Is Nothing) Then
                 For Each h In hs
@@ -196,8 +197,15 @@ Dim digit                           As Boolean
                 '--------------------------
                 ' 9 h di recupero
                 minRec = 24 * 60
-                'minRec = minRec - TimeToMinute(.profiles(1).MaximalHours)
-                minRec = minRec - TimeToMinute(.profiles(1).MinimalHours)
+                
+                ' calcolo ore previste
+                ' le legge dalle ore minime se diverse da 0 altrimenti le legge dalle ore massime
+                If (TimeToMinute(.profiles(1).MinimalHours) > 0) Then
+                    minRec = minRec - TimeToMinute(.profiles(1).MinimalHours)
+                Else
+                    minRec = minRec - TimeToMinute(.profiles(1).MaximalHours)
+                End If
+                
                 minRec = minRec - (8 * 60) ' 8 GFC
                 ' inserisce 1 GFC (1 giorno) e recupero
                 
