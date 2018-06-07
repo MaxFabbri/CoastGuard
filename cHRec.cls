@@ -32,6 +32,8 @@ Private cfgCode()           As String ' compenso forfettario guardia feriale
 Private cfgfCode()          As String ' compenso forfettario guardia festivo
 Private glCode()            As String
 
+Private preHolidayTurnCode()    As String ' profili che nei prefestivi calcolano come i festivi
+
 Private Function IMain_Calculate() As ElabSrvr.CalcResultEnum
 
 ' post-elaborazione
@@ -57,9 +59,7 @@ Private Function IMain_Calculate() As ElabSrvr.CalcResultEnum
 
 Dim daily                           As CDailyData
 
-
 Dim osM                             As IStackMessage
-
 
 Dim somethingHappened               As Boolean
 
@@ -120,7 +120,7 @@ Dim digit                           As Boolean
             osM.Push String(80, "_")
             osM.Push DebugDipValue
             
-            If .profiles(1) Is Nothing Then
+            If (.profiles(1) Is Nothing) Then
                GoTo SkipDay
             End If
             
@@ -188,8 +188,28 @@ Dim digit                           As Boolean
             DebugOperation = StringFormat("Profilo {0} valido", .profiles(1).Code)
             osM.Push DebugOperation
             
+            ' nel caso in cui trovi questi profili ed il giorno successivo sia festivo
+            ' (giornata sia prefestiva)
+            ' deve essere calcolata come festivo
+            If IsInArray(preHolidayTurnCode, .profiles(1).Code) Then
+            
+                ' doveva essere un prefestivo è diventato il sabato
+'                If (oDip.DailyDatas(mCurrDate + 1).Typology = wpTGFestDom) Or _
+'                   (oDip.DailyDatas(mCurrDate + 1).Typology = wpTGFestInfra) Then
+'                    .Typology = wpTGFestInfra
+'                End If
+            
+                ' legge la giornata successiva e se festiva
+                ' cambia la tipologia di questa giornata e la inserisce come non feriale
+                If (WeekDay(mCurrDate, vbMonday) = 6) Then
+                    .Typology = wpTGFestInfra
+                End If
+
+            End If
+            
             ' verifica la tipologia della giornata
             If (.Typology = wpTGFeriale) Then
+            
                 ' giorno feriale
                 ' 24 h                    -
                 ' 7 h previste            -
@@ -343,6 +363,8 @@ Private Function IMain_Initialize() As ElabSrvr.CalcResultEnum
     cfgCode = Split(RINI("Parametri", "Codice CFG Feriale"), ",")
     cfgfCode = Split(RINI("Parametri", "Codice CFG Festivo"), ",")
     glCode = Split(RINI("Parametri", "Codice GL"), ",")
+    
+    preHolidayTurnCode = Split(RINI("Parametri", "Elenco Profili Calcolo Del Sabato Come Festivo"), ",")
     
     LogTrack = (Val(RINI("Parametri", "Log")) <> 0)
     

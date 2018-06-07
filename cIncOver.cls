@@ -116,29 +116,45 @@ Dim overMinutes                     As Integer
             'DebugView "test codice causale superata"
             
             Set hs = .GroupPreAss.Contains(overCodes) ' codici da maggiorare
+            
+            
             If Not (hs Is Nothing) Then
                 For Each h In hs
                 
                     overMinutes = (h.GetMinutes \ 60) * 5
                     
-                    If (overMinutes > 0) Then
+                    h.Note = "Inserita dalla post " & App.EXEName
+                    h.Origin = 3
                     
-                        Set hNew = New cHour
-                        hNew.Code = h.Code
-                        hNew.Minutes = TimeSerial(0, overMinutes, 0)
-                        hNew.Origin = 3
-                        hNew.Note = "Inserita dalla post " & App.EXEName
-                        
-                        oDip.IWriteHour.InsertObjHour mCurrDate, hNew
-                        
-                        DebugView "inserito codice maggiorato " & hNew.Code & " in data " & mCurrDate
-                        
-                        Set hNew = Nothing
-                        
-                    End If
+                    ' rimane solamente la maggiorazione
+                    oDip.IWriteHour.DeleteObjHour mCurrDate, h, h.GetMinutes() - overMinutes
+                    
+                    DebugView "codice maggiorato rimanente " & h.Code & " in data " & mCurrDate & " " & overMinutes
+                    
+                    ' originariamente aggiungeva la maggiorazione alle ore della causale
+                    
+'                    overMinutes = (h.GetMinutes \ 60) * 5
+'
+'                    If (overMinutes > 0) Then
+'
+'                        Set hNew = New cHour
+'                        hNew.Code = h.Code
+'                        hNew.Minutes = TimeSerial(0, overMinutes, 0)
+'                        hNew.Origin = 3
+'                        hNew.Note = "Inserita dalla post " & App.EXEName
+'
+'                        oDip.IWriteHour.InsertObjHour mCurrDate, hNew
+'
+'                        DebugView "inserito codice maggiorato " & hNew.Code & " in data " & mCurrDate
+'
+'                        Set hNew = Nothing
+'
+'                    End If
                         
                 Next
             End If
+            
+            
             
         End With
         

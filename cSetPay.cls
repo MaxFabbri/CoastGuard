@@ -31,17 +31,29 @@ Private mNominativo             As String
 Private counterOver()           As String
 Private minCounterOver()        As Integer
 
+' versione 1.0.1
+' contatore a ore o a giorni
+'Private counterDDOrMinute()     As Boolean
+
 ' contatori ore pagate
 Private counterPay()            As String
 'Private minCounterPay()         As Integer
 
 ' percentuale pagabile pagato
 Private percentagePay           As Integer
+Private percentagePayResidual   As Integer
 
 ' numero contatori coinvolti
 Private maxCount                As Integer
 
 Private resetPrevPay            As Boolean
+
+' versione 1.0.1
+' residuo contatore CFG/F da inserire su contatore REC2 mese successivo a ore 1 gg = 8 ore
+Private counterCodeToConvert    As String
+Private counterCodeToConverted  As String
+Private counterHourConversion   As Integer
+' fine versione 1.0.1
 
 Private Function IPutPay_AfterInitializeDip(CustomMessage As String) As Boolean
     IPutPay_AfterInitializeDip = True
@@ -113,6 +125,9 @@ End Function
 
 Private Function IPutPay_Initialize(WebCaller As Boolean) As Boolean
 
+    Dim rsCounters  As ADODB.Recordset
+    Dim i           As Integer
+
     On Error GoTo Pay_ERROR
     
     DebugOut "Sub IPutPay_Initialize"
@@ -128,6 +143,17 @@ Private Function IPutPay_Initialize(WebCaller As Boolean) As Boolean
         .ReadsCounter = True
     End With
     
+'    Set rsCounters = oDip.GetDefCounter
+'
+'    For i = 1 To maxCount
+'        ' legge se il contatore è a giorni o a ore
+'        rsCounters.Filter = "Codice = " & counterOver(i)
+'        If (Not rsCounters.EOF) Then
+'            ' true giorni false ore
+'            counterDDOrMinute(i) = (rsCounters.Fields("TipoConteggio").Value = 1)
+'        End If
+'    Next
+
     IPutPay_Initialize = True
     
 Pay_EXIT:
@@ -187,6 +213,7 @@ Dim MC              As IMonthlyCalc
     End If
     
     ' legge i contatori delle ore pagabili
+    ' va aggiunto il contatore CFG/F
     For i = 1 To maxCount
         Set rsCounter = oDip.GetCounterFiltered(counterOver(i), mFromDate, True)
         If Not (rsCounter Is Nothing) Then
@@ -195,6 +222,8 @@ Dim MC              As IMonthlyCalc
             End If
         End If
     Next
+    
+    
 
     IPutPay_InitializeDip = True
     
@@ -246,7 +275,6 @@ Dim maxCont         As Integer
     Next
     oS.AddKey "Rigenerazione Valore Precedente Inserito In Paga", ComboBox, "Valore consigilato Sì", "0,1", "Sì,No"
     
-    
     Set oS = oSects.Add("Contatori Pagato")
     For i = 1 To maxCont
         oS.AddKey "Codice Contatore" & i, ListCounterCode, "Inserire il codice del contatore contenente le ore di straordinario pagate " & i
@@ -254,6 +282,16 @@ Dim maxCont         As Integer
     
     ' percentuale da inserire in paga
     oS.AddKey "Percentuale Da Passare In Paga", StringText, "Inserire la percentuale del pagabile da passare in paga"
+    
+    ' versione 1.0.1
+    ' contatori speciali residuo
+    Set oS = oSects.Add("Contatore Speciale Residuo")
+    oS.AddKey "Codice Contatore", ListCounterCode, "Inserire il codice del contatore su cui calcolare il residuo"
+    oS.AddKey "Codice Contatore Residuo A Ore Su Mese Successivo", ListCounterCode, "Inserire il codice del contatore ricalcolate come recupero"
+    oS.AddKey "Numero Minuti Conversione Per Singolo Giorno", StringText, "Inserire la quantità di una singola giornata convertita in minuti"
+    oS.AddKey "Percentuale Da Passare In Paga", StringText, "Inserire la percentuale del pagabile da passare in paga"
+    ' versione 1.0.1
+    
     
 Pay_EXIT:
     Exit Sub
@@ -323,13 +361,19 @@ Dim i           As Integer
     resetPrevPay = (Val(RINI("Contatori Pagabile", "Rigenerazione Valore Precedente Inserito In Paga")) <> 1)
     
     ' lettura codici contatori
+    ' versione 1.0.1
+    ' la percentuale viene fatta anche in base alle giornate non solo sulle ore
+    ' leggere la tipologia del contatore
+    ' se a giorni fare la proporzione in difetto es: 1.5 giorni = 1 giorno
     maxCount = Val(RINI("Contatori Pagabile", "Numero Contatori"))
     
-    If maxCount > 0 Then
+    If (maxCount > 0) Then
     
         ReDim counterOver(1 To maxCount) As String
         ReDim minCounterOver(1 To maxCount) As Integer
         ReDim counterPay(1 To maxCount) As String
+'        ReDim counterDDOrMinute(1 To maxCount) As Boolean
+        
         'ReDim minCounterPay(1 To maxCount) As Integer
         
         For i = 1 To maxCount
@@ -349,6 +393,20 @@ Dim i           As Integer
     End If
     
     percentagePay = Val(RINI("Contatori Pagato", "Percentuale Da Passare In Paga"))
+    
+    ' versione 1.0.1
+    v = Split(RINI("Contatore Speciale Residuo", "Codice Contatore"), ",")
+    If isStringArrayDim(v) Then
+        counterCodeToConvert = v(0)  ' prende il primo
+    End If
+    v = Split(RINI("Contatore Speciale Residuo", "Codice Contatore Residuo A Ore Su Mese Successivo"), ",")
+    If isStringArrayDim(v) Then
+        counterCodeToConverted = v(0)  ' prende il primo
+    End If
+    counterHourConversion = Val(RINI("Contatore Speciale Residuo", "Numero Minuti Conversione Per Singolo Giorno"))
+    
+    percentagePayResidual = Val(RINI("Contatore Speciale Residuo", "Percentuale Da Passare In Paga"))
+    ' fine versione 1.0.1
     
 End Sub
 
@@ -385,13 +443,32 @@ Dim i               As Integer
 
 Dim MC              As IMonthlyCalc
 
+Dim valueDD         As Integer
+Dim valueResidual   As Integer
+
     On Error GoTo Pay_ERROR
     
     DebugOut "Function IPutPay_TerminateDip()"
     
+    
     For i = 1 To maxCount
         If (minCounterOver(i) > 0) Then
-            PutCounterValue counterPay(i), mFromDate, (minCounterOver(i) / 100) * percentagePay
+        
+            valueDD = (minCounterOver(i) / 100) * percentagePay
+            
+            If (counterOver(i) = counterCodeToConvert) Then
+                
+                valueDD = (minCounterOver(i) / 100) * percentagePayResidual
+                ' questi sono giorni per cui vanno divisi per 60
+                valueDD = valueDD \ 60
+                ' calcola il residuo da inserire nel mese successivo
+                valueResidual = (minCounterOver(i) \ 60) - valueDD
+                PutCounterValue counterCodeToConverted, DateValue(mToDate + 1), valueResidual * counterHourConversion
+                
+            End If
+            
+            PutCounterValue counterPay(i), mFromDate, valueDD
+            
         Else
             PutCounterValue counterPay(i), mFromDate, 0
         End If

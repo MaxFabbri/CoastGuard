@@ -52,7 +52,7 @@ Dim somethingHappened               As Boolean
 Dim mark                            As cMark
 
 Dim countMark                       As Integer
-Dim isMarkOut                       As Boolean
+Dim isMarkCorrect                   As Boolean
 
 
     On Error GoTo Main_ERROR
@@ -90,7 +90,6 @@ Dim isMarkOut                       As Boolean
         
         With daily
         
-'            ProfileCode = ""
 '
 '            For Each mark In .marks
 '                If (mark.Code <> "") Then
@@ -107,30 +106,49 @@ Dim isMarkOut                       As Boolean
             ' se ne trova anche solo 1 il profilo di riposo non viene inserito
             If (.GroupPreAss.Contains(ExceptionCodes).Count = 0) Then
                 
-                If (.marks.Count = 0) Then
+                'If (.marks.Count = 0) Then
                 
-                    ' nessuna marcatura assegna sicuramnte il profilo di riposo
-                    oDip.AddProfilePreElab currDate, wpTBProfilo, , BreakProfile
-                    somethingHappened = True
+                    ' nessuna marcatura assegna sicurameente il profilo di riposo
+                    'oDip.AddProfilePreElab currDate, wpTBProfilo, , BreakProfile
+                    'somethingHappened = True
                    
-                ElseIf (WhenAssignProfile = 1) Then
+                'ElseIf (WhenAssignProfile = 1) Then
                 
                     ' ulteriore possibilità può essere assegnato anche se nella giornata c'è solamente una uscita
                     
                     For Each mark In .marks
                         If Not mark.isDummy Then
                             countMark = countMark + 1
-                            isMarkOut = (mark.Way = outway)
+                            isMarkCorrect = (mark.Way = outway)
                         End If
                     Next
                     
-                    If isMarkOut And (countMark = 1) Then
+                    If isMarkCorrect And (countMark = 1) Then
+                    
                         ' ok una sola marcatura nella giornata in uscita
-                        oDip.AddProfilePreElab currDate, wpTBProfilo, , BreakProfile
-                        somethingHappened = True
+                        ' va a vedere se nella giornata precedente l'ultima marcatura è una entrata
+                        ' solo in questo caso può assegnara il R.I.P.
+                        
+                        For Each mark In oDip.DailyDatas(currDate - 1).marks
+                            If Not mark.isDummy Then
+                                'countMark = countMark + 1
+                                isMarkCorrect = (mark.Way = inway)
+                            End If
+                        Next
+                        
+                        If (isMarkCorrect) Then
+                            oDip.AddProfilePreElab currDate, wpTBProfilo, , BreakProfile
+                            somethingHappened = True
+                        End If
+                        
                     End If
-                   
-                End If
+
+                        
+                        
+                    'End If
+                    
+                'End If
+                
             End If
 
              
@@ -219,7 +237,7 @@ Private Function IMain_Initialize() As ElabSrvr.CalcResultEnum
     'loadTurnEver = (Val(RINI("Parametri", "Caricare il turno anche se il profilo è bloccato")) > 0)
     
     BreakProfile = RINI("Profilo Riposo", "Codice Profilo")
-    WhenAssignProfile = Val(RINI("Profilo Riposo", "Regola Assegnamento"))
+    'WhenAssignProfile = Val(RINI("Profilo Riposo", "Regola Assegnamento"))
     ExceptionCodes = Split(RINI("Profilo Riposo", "Eccezione Causali"), ",")
     
     logTrack = (Val(RINI("Parametri", "Abilita log")) > 0)

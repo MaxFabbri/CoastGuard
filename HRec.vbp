@@ -66,7 +66,7 @@ CompatibleEXE32="Versions\HRec.cmp"
 VersionCompatible32="1"
 MajorVer=1
 MinorVer=0
-RevisionVer=3
+RevisionVer=5
 AutoIncrementVer=0
 ServerSupportFiles=0
 VersionComments="CodiceElab=HRec;Pre/Post=1;Periodicità=1;GiornoInizioSett=1"

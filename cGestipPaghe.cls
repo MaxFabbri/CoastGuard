@@ -88,6 +88,8 @@ Dim mapsPayNumber   As Integer
 
 Dim fileProcessed   As Boolean
 
+Dim outList()       As String
+
 Private Function IPutPay_AfterInitializeDip(CustomMessage As String) As Boolean
     IPutPay_AfterInitializeDip = True
 End Function
@@ -182,6 +184,9 @@ End Function
 
 Private Property Get IPutPay_GetFileList() As String()
 
+    ' ritornare l'elenco dei files da scrivere
+    IPutPay_GetFileList = outList
+
 End Property
 
 Private Function IPutPay_GetPassword() As String
@@ -245,13 +250,17 @@ Private Function IPutPay_Initialize(WebCaller As Boolean) As Boolean
 
     ' è completo di percorso e nome
     FileName = RINI("Files", "Path", eINIWhere.LocalINI)
-
-    DebugOperation = "Cancellazione file " & FileName
-    DebugOut DebugOperation
     
-    If FileExist(FileName) Then
-        KillFile FileName, True
-    End If
+    ' fare il push dei file
+    Push outList(), FileName
+
+
+'    DebugOperation = "Cancellazione file " & FileName
+'    DebugOut DebugOperation
+    
+'    If FileExist(FileName) Then
+'        KillFile FileName, True
+'    End If
     
     
     IPutPay_Initialize = True
@@ -532,8 +541,8 @@ Dim minute          As String
 
 Dim i               As Integer
 
-Dim toPayValue      As Integer
-Dim paidValue       As Integer
+Dim toPayValue      As Long
+Dim paidValue       As Long
 
 Dim nullFields()    As String
 
@@ -837,7 +846,7 @@ Dim i   As Integer
     
 End Function
 
-Private Function GetCounterValue(counterCode As String, Data As Date, typeField As payType) As Integer
+Private Function GetCounterValue(counterCode As String, Data As Date, typeField As payType) As Long
 
     Dim rsCounter   As ADODB.Recordset
 

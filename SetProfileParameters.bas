@@ -21,7 +21,7 @@ Dim oS                          As CSection
     
     Set oS = oSects.Add("Profilo Riposo")
     oS.AddKey "Codice Profilo", ListTurnCode, "Specificare il profilo di riposo da inserire sul cartellino"
-    oS.AddKey "Regola Assegnamento", ComboBox, "Inserire il profilo se mancano le marcature oppure se l'unica marcatura della giornata è una uscita", "0,1", "In mancanza di timbrature,In mancanza di timbrature / l'unica marcatura è una uscita"
+    'oS.AddKey "Regola Assegnamento", ComboBox, "Inserire il profilo se mancano le marcature oppure se l'unica marcatura della giornata è una uscita", "0,1", "In mancanza di timbrature,In mancanza di timbrature / l'unica marcatura è una uscita"
     oS.AddKey "Eccezione Causali", ListPresentCode, "Se nel cartellino sono inserite queste causali anche in mancanza di marcature non inserisce il profilo di riposo"
     
     Set oS = oSects.Add("Parametri")

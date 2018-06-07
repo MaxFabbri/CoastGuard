@@ -18,6 +18,11 @@ Dim oS                          As CSection
     oS.AddKey "Codice CFG Feriale", ListPresentCode, "Selezionare il codice di CFG feriale Compenso Forfettario di Guardia da inserire sul cartellino"
     oS.AddKey "Codice CFG Festivo", ListPresentCode, "Selezionare il codice di CFG festivo Compenso Forfettario di Guardia da inserire sul cartellino"
     oS.AddKey "Codice GL", ListPresentCode, "Selezionare il codice GL giornata di lavoro da inserire sul cartellino"
+    
+    ' versione 1.0.4
+    'Elenco Profili Calcolo Del Sabato Come Festivo
+    oS.AddKey "Elenco Profili Calcolo Del Sabato Come Festivo", ListTurnCode, "Indicare i turni per il calcolo CFG e GL sui sabati"
+    
     oS.AddKey "Log", ComboBox, "Selezionare se attivare il LOG", "0,1", "No,Sì"
 
     FrmParameters.Show vbModal

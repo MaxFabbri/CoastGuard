@@ -32,12 +32,24 @@ Private minCounterOver()        As Integer
 ' causali straordinari compensati negativi
 Private codeMinus()             As String
 
+' versione 1.0.2
+' causale di recupero 2 REC2 rappresentato dal codice CFG/F che non viene pagato
+' il codice è a giornata intera ogni giornata viene convertita a ore in 8 ore
+' REC2-
+' REC2 contatore
+' REC2+
+' nella compensazione avremo in sequenza REC, REC2 e straordinari
+
+' mettiamo un indice anche per le causali di recupero possono essere diverse
+Private MaxCountRec                 As Integer
+
 ' contatore ore a recupero
-Private counterRec              As String
-Private minCounterRec           As Integer
+Private counterRec()              As String
+Private minCounterRec()           As Integer
 
 ' causale ore recuperate
-Private codeRecMinus            As String
+Private codeRecMinus()            As String
+' fine versione 1.0.2
 
 ' versione 1.0.1
 ' causale ore mancanti
@@ -54,7 +66,7 @@ Private missingCodeMinus        As String
 Private codeOver()              As String
 
 ' causale di recupero nel caso sia da compensare con REC-
-Private codeRec                 As String
+Private codeRec()               As String
 
 Private maxCount                As Integer
 
@@ -73,7 +85,7 @@ Private Function IPutPay_ChangeDay(oday As CDatoGiornaliero) As ePrctInfoStatus
 Dim minus       As Integer
 Dim Value       As Integer
 
-Dim hour        As cOra
+Dim Hour        As cOra
 
 Dim totOver     As Integer
 
@@ -96,51 +108,66 @@ Dim i           As Integer
             ' recupera la differenza oraria tra le ore massime del profilo orario
             ' e il totale delle ore di presenza/assenza da conteggiare (senza ignora)
             minus = TimeToMinute(.Profili(1).OreMassime) - .ORE.GetNotIgnore.Sum()
+            Value = 0
+            
+            Debug.Print oday.Giorno, minus
             
             If (minus > 0) Then
             
-                ' controlla prima il cumulo ore sulla causale di recupero
-                Value = Min(minus, minCounterRec)
+                ' versione 1.0.2
+                For i = 1 To MaxCountRec
                 
-                If (Value > 0) Then
-                    ' inserisce causale di REC-
-                    Set hour = New cOra
-                    hour.Causale = codeRecMinus
-                    hour.DateRif = oday.Giorno
-                    hour.Ora = TimeSerial(0, Value, 0)
-                    oDip.AddObjHour hour
-                    Set hour = Nothing
-                    minCounterRec = minCounterRec - Value
-                    IPutPay_ChangeDay = Successful
-                End If
+                    ' controlla prima il cumulo ore sulla causale di recupero
+                    Value = Min(minus, minCounterRec(i))
+                    
+                    If (Value > 0) Then
+                        ' inserisce causale di REC-
+                        Set Hour = New cOra
+                        Hour.Causale = codeRecMinus(i)
+                        Hour.DateRif = oday.Giorno
+                        Hour.Ora = TimeSerial(0, Value, 0)
+                        oDip.AddObjHour Hour
+                        Set Hour = Nothing
+                        minCounterRec(i) = minCounterRec(i) - Value
+                        IPutPay_ChangeDay = Successful
+                    End If
+                    
+                    minus = minus - Value
+                    
+                Next
                 
                 ' poi controlla il cumulo ore sulle ore di straordinario compensabili
                 For i = 1 To maxCount
-                    minus = minus - Value
+                    
                     Value = Min(minus, minCounterOver(i))
+                    
                     If (Value > 0) Then
                         ' inserisce causale di STR-
-                        Set hour = New cOra
-                        hour.Causale = codeMinus(i)
-                        hour.DateRif = oday.Giorno
-                        hour.Ora = TimeSerial(0, Value, 0)
-                        oDip.AddObjHour hour
-                        Set hour = Nothing
+                        Set Hour = New cOra
+                        Hour.Causale = codeMinus(i)
+                        Hour.DateRif = oday.Giorno
+                        Hour.Ora = TimeSerial(0, Value, 0)
+                        oDip.AddObjHour Hour
+                        Set Hour = Nothing
                         minCounterOver(i) = minCounterOver(i) - Value
                         IPutPay_ChangeDay = Successful
                     End If
+                    
+                    minus = minus - Value
+                    
                 Next
                 
                 ' il resto se ne rimane viene inserito come ore mancanti
-                minus = minus - Value
+                'minus = minus - Value
+                
                 If (minus > 0) Then
                     ' mancano ancora dei minuti ma non ci sono più ore da recuperare
-                    Set hour = New cOra
-                    hour.Causale = missingCode
-                    hour.DateRif = oday.Giorno
-                    hour.Ora = TimeSerial(0, minus, 0)
-                    oDip.AddObjHour hour
-                    Set hour = Nothing
+                    Set Hour = New cOra
+                    Hour.Causale = missingCode
+                    Hour.DateRif = oday.Giorno
+                    Hour.Ora = TimeSerial(0, minus, 0)
+                    oDip.AddObjHour Hour
+                    Set Hour = Nothing
                     IPutPay_ChangeDay = Successful
                 End If
                     
@@ -149,33 +176,37 @@ Dim i           As Integer
                 ' verifica se ci sono ore di recupero o di straordinario da compensare con ore mancanti
                 If (minMissingCounter > 0) Then
                 
-                    ' verifica prima il codice di recupero
-                    totOver = .ORE.ContainsCode(codeRec).Sum()
-                    Value = Min(totOver, minMissingCounter)
+                    ' versione 1.0.2
+                    For i = 1 To MaxCountRec
                     
-                    If (Value > 0) Then
-                    
-                        ' inserisce causale di REC-
-                        Set hour = New cOra
-                        hour.Causale = codeRecMinus
-                        hour.DateRif = oday.Giorno
-                        hour.Ora = TimeSerial(0, Value, 0)
-                        oDip.AddObjHour hour
-                        Set hour = Nothing
+                        ' verifica prima il codice di recupero
+                        totOver = .ORE.ContainsCode(codeRec(i)).Sum()
+                        Value = Min(totOver, minMissingCounter)
                         
-                        ' associata alla causale di recupero ore mancanti OreM-
-                        Set hour = New cOra
-                        hour.Causale = missingCodeMinus
-                        hour.DateRif = oday.Giorno
-                        hour.Ora = TimeSerial(0, Value, 0)
-                        oDip.AddObjHour hour
-                        Set hour = Nothing
+                        If (Value > 0) Then
                         
-                        minMissingCounter = minMissingCounter - Value
-                        
-                        IPutPay_ChangeDay = Successful
-                        
-                    End If
+                            ' inserisce causale di REC-
+                            Set Hour = New cOra
+                            Hour.Causale = codeRecMinus(i)
+                            Hour.DateRif = oday.Giorno
+                            Hour.Ora = TimeSerial(0, Value, 0)
+                            oDip.AddObjHour Hour
+                            Set Hour = Nothing
+                            
+                            ' associata alla causale di recupero ore mancanti OreM-
+                            Set Hour = New cOra
+                            Hour.Causale = missingCodeMinus
+                            Hour.DateRif = oday.Giorno
+                            Hour.Ora = TimeSerial(0, Value, 0)
+                            oDip.AddObjHour Hour
+                            Set Hour = Nothing
+                            
+                            minMissingCounter = minMissingCounter - Value
+                            
+                            IPutPay_ChangeDay = Successful
+                            
+                        End If
+                    Next
 
                     For i = 1 To maxCount
                     
@@ -187,20 +218,20 @@ Dim i           As Integer
                         If (Value > 0) Then
                         
                             ' inserisce la causale STR-
-                            Set hour = New cOra
-                            hour.Causale = codeMinus(i)
-                            hour.DateRif = oday.Giorno
-                            hour.Ora = TimeSerial(0, Value, 0)
-                            oDip.AddObjHour hour
-                            Set hour = Nothing
+                            Set Hour = New cOra
+                            Hour.Causale = codeMinus(i)
+                            Hour.DateRif = oday.Giorno
+                            Hour.Ora = TimeSerial(0, Value, 0)
+                            oDip.AddObjHour Hour
+                            Set Hour = Nothing
                             
                             ' associata alla causale di recupero ore mancanti OreM-
-                            Set hour = New cOra
-                            hour.Causale = missingCodeMinus
-                            hour.DateRif = oday.Giorno
-                            hour.Ora = TimeSerial(0, Value, 0)
-                            oDip.AddObjHour hour
-                            Set hour = Nothing
+                            Set Hour = New cOra
+                            Hour.Causale = missingCodeMinus
+                            Hour.DateRif = oday.Giorno
+                            Hour.Ora = TimeSerial(0, Value, 0)
+                            oDip.AddObjHour Hour
+                            Set Hour = Nothing
                         
                             minMissingCounter = minMissingCounter - Value
                             IPutPay_ChangeDay = Successful
@@ -296,8 +327,12 @@ Dim i           As Integer
     End With
     
     ' ricerca i CausID x segare direttamente le ore
+    ' questi sono i recuperi negativi
+    For i = 1 To MaxCountRec
+        causIDs = Concat(causIDs, codeRecMinus(i))
+    Next
+    
     ' questi sono gli straordinari negativi
-    causIDs = Concat(causIDs, codeRecMinus)
     For i = 1 To maxCount
         causIDs = Concat(causIDs, codeMinus(i))
     Next
@@ -355,12 +390,15 @@ Dim i               As Integer
     Next
 
     ' --- causale ore di recupero
-    Set rsCounter = oDip.GetCounterFiltered(counterRec, mFromDate, True)
-    If Not (rsCounter Is Nothing) Then
-        If Not rsCounter.EOF Then
-            minCounterRec = Val(rsCounter.Fields("Totale") & "")
+    ' versione 1.0.2
+    For i = 1 To MaxCountRec
+        Set rsCounter = oDip.GetCounterFiltered(counterRec(i), mFromDate, True)
+        If Not (rsCounter Is Nothing) Then
+            If Not rsCounter.EOF Then
+                minCounterRec(i) = Val(rsCounter.Fields("Totale") & "")
+            End If
         End If
-    End If
+    Next
     
     ' versione 1.0.1
     ' --- ore mancanti
@@ -408,6 +446,7 @@ Dim oS              As CSection
 Dim i               As Integer
 
 Dim maxCont         As Integer
+Dim maxContRec      As Integer
 
     On Error GoTo Pay_ERROR
     
@@ -416,7 +455,18 @@ Dim maxCont         As Integer
 
     ' configurazione contatori riguardanti l'eccedenza oraria
     Set oS = oSects.Add("Contatori Di Eccedenza")
-    oS.AddKey "Recupero", ListCounterCode, "Inserire il contatore contenente le ore da recuperare"
+    
+    ' versione 1.0.2
+    oS.AddKey "Numero Contatori Recupero", StringText, "Inserire il numero dei contatori di recupero"
+    maxContRec = Val(oS.GetKey("Numero Contatori Recupero").Value)
+    For i = 1 To maxContRec
+        oS.AddKey "Recupero" & i, ListCounterCode, "Inserire il contatore contenente le ore di recupero pagabili con priorità " & i
+    Next
+    ' versione 1.0.2
+
+    ' versione 1.0.1
+    'oS.AddKey "Recupero", ListCounterCode, "Inserire il contatore contenente le ore da recuperare"
+    
     oS.AddKey "Numero Contatori Straordinari", StringText, "Inserire il numero dei contatori di straordinario"
     maxCont = Val(oS.GetKey("Numero Contatori Straordinari").Value)
     For i = 1 To maxCont
@@ -426,7 +476,9 @@ Dim maxCont         As Integer
     ' versione 1.0.1
     ' causali eccedenti
     Set oS = oSects.Add("Causali Di Eccedenza")
-    oS.AddKey "Recupero", ListPresentCode, "Inserire il codice di ore da recuperare"
+    For i = 1 To maxContRec
+        oS.AddKey "Recupero" & i, ListPresentCode, "Inserire il codice di ore da recuperare"
+    Next
     ' è uguale al numero dei contatori di straordinario
     ' non lo può più leggere perché ha cambiato sezione mantiene il valore precedente
     ' maxCont = Val(oS.GetKey("Numero Contatori Straordinari").Value)
@@ -436,7 +488,9 @@ Dim maxCont         As Integer
     
     ' configurazione contatori riguardanti le causali di recupero orario
     Set oS = oSects.Add("Causali Di Recupero")
-    oS.AddKey "Recupero", ListPresentCode, "Inserire il codice di ore recuperate"
+    For i = 1 To maxContRec
+        oS.AddKey "Recupero" & i, ListPresentCode, "Inserire il codice di ore recuperate"
+    Next
     ' ogni contatore ha la sua causale che lo decrementa
     For i = 1 To maxCont
         oS.AddKey "Straordinario" & i, ListPresentCode, "Inserire il codice di straordinario recuperato " & i
@@ -485,7 +539,7 @@ Dim SQL             As String
     
     ' cancella le causali di recupero assegnate precedentemente dal programma x dipid nel periodo
     If (causIDs <> "") Then
-        SQL = "DELETE FROM ORE WHERE DataOremin BETWEEN " & GetSQLDate(mFromDate) & " AND " & GetSQLDate(mToDate) & " AND Causid IN(" & causIDs & ") "
+        SQL = "DELETE FROM ORE WHERE " & GetSQLDateValue("DataOremin") & "  BETWEEN " & GetSQLDate(mFromDate) & " AND " & GetSQLDate(mToDate) & " AND Causid IN(" & causIDs & ") "
         DebugOperation = SQL
         Debug.Print SQL
         RP.GetPersConnection(oDip.DipID).ExecuteCommand SQL
@@ -522,20 +576,20 @@ End Function
 
 Private Sub IPutPay_ReadINIParameters()
 
-Dim v() As String
+    Dim v() As String
 
-Dim i           As Integer
+    Dim i           As Integer
 
     ' lettura codici contatori
     maxCount = Val(RINI("Contatori Di Eccedenza", "Numero Contatori Straordinari"))
     
-    If maxCount > 0 Then
+    If (maxCount > 0) Then
     
         ReDim counterOver(1 To maxCount) As String
-        ReDim minCounterOver(1 To maxCount) As Integer
         ReDim codeMinus(1 To maxCount) As String
-        
         ReDim codeOver(1 To maxCount) As String
+        
+        ReDim minCounterOver(1 To maxCount) As Integer
     
         For i = 1 To maxCount
         
@@ -559,22 +613,39 @@ Dim i           As Integer
         
     End If
    
-    v = Split(RINI("Contatori Di Eccedenza", "Recupero"), ",")
-    If isStringArrayDim(v) Then
-        counterRec = v(0) ' prende il primo
-    End If
+    ' versione 1.0.2
+    ' lettura codici contatori recupero
+    MaxCountRec = Val(RINI("Contatori Di Eccedenza", "Numero Contatori Recupero"))
     
-    v = Split(RINI("Causali Di Recupero", "Recupero"), ",")
-    If isStringArrayDim(v) Then
-        codeRecMinus = v(0) ' prende il primo
-    End If
+    If (MaxCountRec > 0) Then
     
-    ' versione 1.0.1
-    v = Split(RINI("Causali Di Eccedenza", "Recupero"), ",")
-    If isStringArrayDim(v) Then
-        codeRec = v(0) ' prende il primo
-    End If
+        ReDim counterRec(1 To MaxCountRec) As String
+        ReDim codeRecMinus(1 To MaxCountRec) As String
+        ReDim codeRec(1 To MaxCountRec) As String
+        
+        ReDim minCounterRec(1 To MaxCountRec) As Integer
+        
+        For i = 1 To MaxCountRec
+        
+            v = Split(RINI("Contatori Di Eccedenza", "Recupero" & i), ",")
+            If isStringArrayDim(v) Then
+                counterRec(i) = v(0) ' prende il primo
+            End If
+            
+            v = Split(RINI("Causali Di Recupero", "Recupero" & i), ",")
+            If isStringArrayDim(v) Then
+                codeRecMinus(i) = v(0) ' prende il primo
+            End If
 
+            v = Split(RINI("Causali Di Eccedenza", "Recupero" & i), ",")
+            If isStringArrayDim(v) Then
+                codeRec(i) = v(0) ' prende il primo
+            End If
+
+        Next
+
+    End If
+    
     
     ' versione 1.0.1
     ' ore mancanti contatore e codice causale
